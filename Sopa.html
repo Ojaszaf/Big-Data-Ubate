@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ubaté Stories | San Andreas Big Data & IoT - PyME Ubaté</title>
+  <link rel="stylesheet" href="Papa.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Changa:wght@500;700;800&family=Permanent+Marker&family=Titan+One&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- Banner de misión superada (aparece una vez al cargar) -->
+  <div class="mission" id="mission" aria-hidden="true">
+    <p class="mission-title">¡Misión superada!</p>
+    <p class="mission-reward">RESPETO +</p>
+    <p class="mission-sub">Bodega de Ubaté bajo control</p>
+  </div>
+
+  <header class="header">
+    <div class="header-container">
+      <div class="title-wrap">
+        <h1 class="sa-title">Ubaté Stories</h1>
+        <p class="sa-subtitle">San Andreas Big Data &amp; IoT Control</p>
+      </div>
+      <div class="hud" aria-label="HUD">
+        <div class="hud-clock" id="hud-clock">00:00</div>
+        <div class="hud-money">$00'250.000</div>
+        <div class="stars" role="img" aria-label="Nivel de búsqueda 0"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="status-badge"><span class="dot"></span> Respeto: ESP32 en línea</div>
+      </div>
+    </div>
+    <div class="skyline" aria-hidden="true"></div>
+  </header>
+
+  <main class="container">
+
+    <section class="kpi-grid" aria-label="Indicadores principales">
+      <div class="card kpi-card">
+        <h3>Temperatura bodega</h3>
+        <p class="kpi-value" id="temp-val">-- °C</p>
+        <div class="bar bar-health" role="img" aria-label="Nivel de temperatura"><span id="temp-bar"></span></div>
+        <span class="kpi-subtext">Sensor DHT22 (ESP32)</span>
+      </div>
+
+      <div class="card kpi-card">
+        <h3>Humedad relativa</h3>
+        <p class="kpi-value" id="hum-val">-- %</p>
+        <div class="bar bar-armor" role="img" aria-label="Nivel de humedad"><span id="hum-bar"></span></div>
+        <span class="kpi-subtext">Sensor DHT22 (ESP32)</span>
+      </div>
+
+      <div class="card kpi-card">
+        <h3>Ventas del día</h3>
+        <p class="kpi-value money">$ 1'250.000</p>
+        <span class="kpi-subtext">+12% bono Grove St.</span>
+      </div>
+
+      <div class="card kpi-card">
+        <h3>Riesgo sobrestock</h3>
+        <p class="kpi-value status-good">0% bajo</p>
+        <div class="stars" role="img" aria-label="Nivel de búsqueda: 0 de 5 estrellas">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <span class="kpi-subtext">Demanda optimizada, la policía no te busca</span>
+      </div>
+    </section>
+
+    <section class="charts-grid" aria-label="Gráficos">
+      <div class="card chart-card">
+        <h2>Monitoreo en tiempo real (ESP32)</h2>
+        <canvas id="iotChart"></canvas>
+      </div>
+
+      <div class="card chart-card">
+        <h2>Histórico vs. predicción de ventas</h2>
+        <canvas id="salesChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Radio: ticker estilo emisora del juego -->
+    <section class="radio" aria-label="Radio">
+      <span class="radio-label">Radio Ubaté FM</span>
+      <span class="radio-track" id="radio-track">Sintonizando…</span>
+    </section>
+
+  </main>
+
+  <script src="Pollo.js"></script>
+</body>
+</html>
