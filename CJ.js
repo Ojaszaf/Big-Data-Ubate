@@ -148,12 +148,12 @@ window.addEventListener("load", () => {
   }
 
   // Primer dato inmediato y luego simulación de llegada de datos en vivo
-  const lecturaSimulada = () => actualizarDatosIoT(16 + Math.random() * 4, 60 + Math.random() * 10);
-  lecturaSimulada();
-  setInterval(lecturaSimulada, 3000);
-});
+ // const lecturaSimulada = () => actualizarDatosIoT(16 + Math.random() * 4, 60 + Math.random() * 10);
+ // lecturaSimulada();
+  //setInterval(lecturaSimulada, 3000);
+
   // ---- Conexión real con la ESP32 ----
-  const ESP32_URL = 'http://192.168.1.50/datos';   // <-- cambia por la IP de tu ESP32
+  const ESP32_URL = 'http://10.143.117.64/datos';   // <-- cambia por la IP de tu ESP32
 
   function setEstado(enLinea) {
     const badge = document.querySelector('.status-badge');
@@ -176,3 +176,4 @@ window.addEventListener("load", () => {
 
   leerESP32();
   setInterval(leerESP32, 3000);
+});

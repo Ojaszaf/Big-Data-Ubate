@@ -14,7 +14,7 @@ PASSWORD = "TU_CLAVE"     # <-- contraseña de tu red WiFi
 PIN_DHT = 4               # <-- pin de datos del DHT22
 PUERTO = 80
 
-sensor = dht.DHT22(Pin(PIN_DHT))
+sensor = dht.DHT11(Pin(PIN_DHT))
 led = Pin(2, Pin.OUT)     # LED integrado de la mayoría de ESP32 (parpadea en cada petición)
 
 # Cabeceras CORS: permiten que el dashboard (otra página) lea los datos
