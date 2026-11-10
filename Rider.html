@@ -6,8 +6,9 @@
   <title>Ubaté Stories | San Andreas Big Data & IoT - PyME Ubaté</title>
   <link rel="stylesheet" href="BigSmoke.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Changa:wght@500;700;800&family=Permanent+Marker&family=Titan+One&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -15,7 +16,7 @@
   <!-- Banner de misión superada (aparece una vez al cargar) -->
   <div class="mission" id="mission" aria-hidden="true">
     <p class="mission-title">¡Misión superada!</p>
-    <p class="mission-reward">RESPETO +</p>
+    <p class="mission-reward">RESPETO</p>
     <p class="mission-sub">Bodega de Ubaté bajo control</p>
   </div>
 
@@ -27,7 +28,7 @@
       </div>
       <div class="hud" aria-label="HUD">
         <div class="hud-clock" id="hud-clock">00:00</div>
-        <div class="hud-money">$00'250.000</div>
+        <div class="hud-money" id="hud-money">$0</div>
         <div class="stars" role="img" aria-label="Nivel de búsqueda 0"><i></i><i></i><i></i><i></i><i></i></div>
         <div class="status-badge"><span class="dot"></span> Respeto: ESP32 en línea</div>
       </div>
@@ -54,8 +55,8 @@
 
       <div class="card kpi-card">
         <h3>Ventas del día</h3>
-        <p class="kpi-value money">$ 1'250.000</p>
-        <span class="kpi-subtext">+12% bono Grove St.</span>
+      <p class="kpi-value money" id="ventas-dia">$0</p>
+      <span class="kpi-subtext" id="ventas-dia-sub">Aún sin ventas hoy</span>
       </div>
 
       <div class="card kpi-card">
@@ -79,6 +80,32 @@
         <canvas id="salesChart"></canvas>
       </div>
     </section>
+    <section class="card chart-card mov-card" aria-label="Ingresos y salidas">
+  <h2>Ingresos y salidas</h2>
+  <form class="mov-form" id="mov-form" autocomplete="off">
+    <input name="concepto" type="text" placeholder="Concepto" maxlength="60" aria-label="Concepto">
+    <input name="valor" type="number" min="1" step="1" placeholder="Valor ($)" aria-label="Valor">
+    <select name="tipo" aria-label="Tipo"><option value="ingreso">Ingreso</option><option value="salida">Salida</option></select>
+    <button type="submit">Agregar</button>
+  </form>
+  <p class="mov-error" id="mov-error" role="alert"></p>
+  <div class="mov-tools">
+    <label>Día <input type="date" id="dia-sel"></label>
+    <button type="button" id="btn-pdf">Guardar PDF del día</button>
+  </div>
+  <div class="table-wrap">
+    <table class="mov">
+      <thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th class="num">Valor</th><th aria-label="Acciones"></th></tr></thead>
+      <tbody id="mov-body"></tbody>
+      <tfoot>
+        <tr><td colspan="3">Total ingresos del día</td><td class="num ingreso" id="tot-ing"></td><td></td></tr>
+        <tr><td colspan="3">Total salidas del día</td><td class="num salida" id="tot-sal"></td><td></td></tr>
+        <tr><td colspan="3">Saldo del día</td><td class="num" id="tot-saldo"></td><td></td></tr>
+        <tr><td colspan="3">Acumulado total (todos los días)</td><td class="num" id="tot-acum"></td><td></td></tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
 
     <!-- Radio: ticker estilo emisora del juego -->
     <section class="radio" aria-label="Radio">

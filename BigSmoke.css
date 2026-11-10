@@ -304,3 +304,28 @@ body {
   border-bottom: 2px solid var(--menu-orange);
 }
 .card { border: 2px solid #000; border-left: 8px solid var(--grove); box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 8px 0 #000; }
+/* ======== TABLA INGRESOS Y SALIDAS ======== */
+.mov-card { margin-top: 18px; }
+.mov-form { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.mov-form input, .mov-form select { font: inherit; padding: 8px 10px; color: var(--text); background: #000; border: 2px solid #000; outline: 1px solid rgba(255,255,255,.25); border-radius: 2px; }
+.mov-form input[name="concepto"] { flex: 1 1 200px; }
+.mov-form input[name="valor"] { flex: 0 1 150px; }
+.mov-form button { font-family: 'Titan One', sans-serif; padding: 8px 20px; color: #fff; background: var(--grove); border: 2px solid #000; cursor: pointer; text-shadow: 1px 1px 0 #000; }
+.mov-error { min-height: 1.3em; margin-bottom: 6px; font-size: .85rem; color: #ff6b6b; }
+.table-wrap { overflow-x: auto; }
+table.mov { width: 100%; min-width: 520px; border-collapse: collapse; }
+.mov th { text-align: left; padding: 8px 10px; color: var(--menu-orange); border-bottom: 2px solid var(--menu-orange); }
+.mov td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.mov .num { text-align: right; font-variant-numeric: tabular-nums; }
+.mov .ingreso { color: var(--grove-bright); }
+.mov .salida { color: #ff6b6b; }
+.mov tfoot td { font-family: 'Titan One', sans-serif; border-bottom: 0; }
+.mov tfoot tr:first-child td { border-top: 2px solid var(--menu-orange); }
+/* ======== DÍA Y PDF ======== */
+.mov-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.mov-tools label { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--menu-orange); }
+.mov-tools input { font: inherit; padding: 8px 10px; color: var(--text); background: #000; border: 2px solid #000; outline: 1px solid rgba(255,255,255,.25); border-radius: 2px; color-scheme: dark; }
+.mov-tools button { font-family: 'Titan One', sans-serif; padding: 8px 18px; color: #000; background: var(--menu-orange); border: 2px solid #000; cursor: pointer; }
+.mov .del { padding: 2px 8px; font: inherit; color: var(--muted); background: none; border: 1px solid rgba(255,255,255,.25); cursor: pointer; }
+.mov .del:hover { color: #ff6b6b; border-color: #ff6b6b; }
+.mov .vacio { text-align: center; color: var(--muted); }

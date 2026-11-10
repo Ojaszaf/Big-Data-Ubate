@@ -1,5 +1,159 @@
 window.addEventListener("load", () => {
   console.log("San Andreas Dashboard iniciado.");
+    // ---- Ingresos y salidas (por día) ----
+  const CLAVE = 'movimientosUbate2';
+  const dinero = n => '$' + Math.abs(n).toLocaleString('es-CO');
+  const signo = n => (n < 0 ? '-' : '') + dinero(n);
+  const dosDig = n => String(n).padStart(2, '0');
+  const hoyISO = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + dosDig(d.getMonth() + 1) + '-' + dosDig(d.getDate());
+  };
+  const fechaBonita = iso => iso.split('-').reverse().join('/');
+  const suma = (lista, tipo) => lista.filter(m => m.tipo === tipo).reduce((a, m) => a + m.valor, 0);
+  const fijar = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+  let movimientos = [];
+  try {
+    const g = JSON.parse(localStorage.getItem(CLAVE));
+    if (Array.isArray(g)) movimientos = g;
+  } catch (e) {}
+  const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(movimientos)); } catch (e) {} };
+
+  const diaInput = document.getElementById('dia-sel');
+  if (diaInput) diaInput.value = hoyISO();
+  const diaActual = () => (diaInput && diaInput.value) || hoyISO();
+  const movsDelDia = dia => movimientos.filter(m => m.fecha === dia).sort((a, b) => a.hora.localeCompare(b.hora));
+
+  function pintarMovimientos() {
+    const dia = diaActual();
+    const delDia = movsDelDia(dia);
+    const body = document.getElementById('mov-body');
+    if (body) {
+      body.replaceChildren();
+      if (!delDia.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5; td.className = 'vacio'; td.textContent = 'Sin movimientos este día';
+        tr.appendChild(td); body.appendChild(tr);
+      }
+      delDia.forEach(m => {
+        const tr = document.createElement('tr');
+        const celdas = [m.hora, m.concepto, m.tipo === 'ingreso' ? 'Ingreso' : 'Salida',
+          (m.tipo === 'ingreso' ? '+' : '-') + dinero(m.valor)];
+        celdas.forEach((txt, i) => {
+          const td = document.createElement('td');
+          td.textContent = txt;
+          if (i >= 2) td.className = m.tipo;
+          if (i === 3) td.classList.add('num');
+          tr.appendChild(td);
+        });
+        const tdDel = document.createElement('td');
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'del'; b.textContent = '×';
+        b.setAttribute('aria-label', 'Eliminar movimiento');
+        b.addEventListener('click', () => {
+          movimientos = movimientos.filter(x => x.id !== m.id);
+          guardar(); pintarMovimientos();
+        });
+        tdDel.appendChild(b); tr.appendChild(tdDel);
+        body.appendChild(tr);
+      });
+    }
+
+    // Totales del día seleccionado
+    const ingDia = suma(delDia, 'ingreso'), salDia = suma(delDia, 'salida');
+    fijar('tot-ing', '+' + dinero(ingDia));
+    fijar('tot-sal', '-' + dinero(salDia));
+    fijar('tot-saldo', signo(ingDia - salDia));
+
+    // Total acumulado de TODOS los días (se suma solo cada vez que agregas un movimiento)
+    const saldoTotal = suma(movimientos, 'ingreso') - suma(movimientos, 'salida');
+    fijar('tot-acum', signo(saldoTotal));
+    const hud = document.getElementById('hud-money');
+    if (hud) {
+      hud.textContent = signo(saldoTotal);
+      hud.style.color = saldoTotal < 0 ? '#ff6b6b' : '';
+    }
+
+    // Tarjeta "Ventas del día": ingresos de HOY
+    const hoy = movsDelDia(hoyISO());
+    const ingHoy = suma(hoy, 'ingreso');
+    fijar('ventas-dia', dinero(ingHoy));
+    fijar('ventas-dia-sub', ingHoy ? 'Salidas de hoy: ' + dinero(suma(hoy, 'salida')) : 'Aún sin ventas hoy');
+  }
+
+  const formMov = document.getElementById('mov-form');
+  if (formMov) {
+    formMov.addEventListener('submit', e => {
+      e.preventDefault();
+      const concepto = formMov.elements.concepto.value.trim();
+      const valor = Number(formMov.elements.valor.value);
+      const err = document.getElementById('mov-error');
+      if (!concepto || !(valor > 0)) {
+        err.textContent = 'Escribe un concepto y un valor mayor a 0';
+        return;
+      }
+      err.textContent = '';
+      const d = new Date();
+      movimientos.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        fecha: diaActual(),
+        hora: dosDig(d.getHours()) + ':' + dosDig(d.getMinutes()),
+        concepto, tipo: formMov.elements.tipo.value, valor
+      });
+      guardar(); formMov.reset(); pintarMovimientos();
+    });
+  }
+  if (diaInput) diaInput.addEventListener('change', () => { fijar('mov-error', ''); pintarMovimientos(); });
+
+  // PDF del día seleccionado
+  const btnPdf = document.getElementById('btn-pdf');
+  if (btnPdf) btnPdf.addEventListener('click', () => {
+    const err = document.getElementById('mov-error');
+    const dia = diaActual();
+    const lista = movsDelDia(dia);
+    if (!lista.length) { err.textContent = 'No hay movimientos en ese día para guardar'; return; }
+    if (!window.jspdf) { err.textContent = 'No cargó la librería de PDF, revisa tu conexión a internet'; return; }
+    err.textContent = '';
+    const doc = new window.jspdf.jsPDF();
+    doc.setFillColor(0, 0, 0); doc.rect(0, 0, 210, 30, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.text('Ubaté Stories', 14, 14);
+    doc.setFontSize(11); doc.setTextColor(240, 168, 58); doc.text('Reporte del día ' + fechaBonita(dia), 14, 23);
+    let y = 42;
+    const cabecera = () => {
+      doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+      doc.text('Hora', 14, y); doc.text('Concepto', 36, y); doc.text('Tipo', 130, y);
+      doc.text('Valor', 196, y, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      y += 3; doc.line(14, y, 196, y); y += 7;
+    };
+    cabecera();
+    lista.forEach(m => {
+      if (y > 275) { doc.addPage(); y = 20; cabecera(); }
+      doc.setTextColor(0, 0, 0);
+      doc.text(m.hora, 14, y);
+      doc.text(doc.splitTextToSize(m.concepto, 90)[0], 36, y);
+      doc.text(m.tipo === 'ingreso' ? 'Ingreso' : 'Salida', 130, y);
+      if (m.tipo === 'ingreso') doc.setTextColor(30, 130, 50); else doc.setTextColor(190, 40, 40);
+      doc.text((m.tipo === 'ingreso' ? '+' : '-') + dinero(m.valor), 196, y, { align: 'right' });
+      y += 7;
+    });
+    if (y > 240) { doc.addPage(); y = 20; }
+    y += 3; doc.line(14, y, 196, y); y += 8;
+    const ing = suma(lista, 'ingreso'), sal = suma(lista, 'salida');
+    const hasta = movimientos.filter(m => m.fecha <= dia);
+    const acumulado = suma(hasta, 'ingreso') - suma(hasta, 'salida');
+    doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold');
+    doc.text('Total ingresos', 14, y); doc.text('+' + dinero(ing), 196, y, { align: 'right' }); y += 7;
+    doc.text('Total salidas', 14, y); doc.text('-' + dinero(sal), 196, y, { align: 'right' }); y += 7;
+    doc.text('Saldo del día', 14, y); doc.text(signo(ing - sal), 196, y, { align: 'right' }); y += 12;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Acumulado total hasta este día: ' + signo(acumulado), 14, y);
+    doc.save('reporte-' + dia + '.pdf');
+  });
+
+  pintarMovimientos();
 
   // Quitar el banner de misión del DOM cuando termina su animación
   const mission = document.getElementById('mission');
@@ -148,12 +302,12 @@ window.addEventListener("load", () => {
   }
 
   // Primer dato inmediato y luego simulación de llegada de datos en vivo
- // const lecturaSimulada = () => actualizarDatosIoT(16 + Math.random() * 4, 60 + Math.random() * 10);
- // lecturaSimulada();
+  //const lecturaSimulada = () => actualizarDatosIoT(16 + Math.random() * 4, 60 + Math.random() * 10);
+  //lecturaSimulada();
   //setInterval(lecturaSimulada, 3000);
 
   // ---- Conexión real con la ESP32 ----
-  const ESP32_URL = 'http://10.143.117.64/datos';   // <-- cambia por la IP de tu ESP32
+  const ESP32_URL = 'http://10.157.16.157/datos';   // <-- cambia por la IP de tu ESP32
 
   function setEstado(enLinea) {
     const badge = document.querySelector('.status-badge');

@@ -9,8 +9,8 @@ import dht
 from machine import Pin
 
 # ---------- CONFIGURACIÓN ----------
-SSID = "TU_WIFI"          # <-- nombre de tu red WiFi
-PASSWORD = "TU_CLAVE"     # <-- contraseña de tu red WiFi
+SSID = "U-SALAS"          # <-- nombre de tu red WiFi
+PASSWORD = "Ucund1n4m4rc4!"     # <-- contraseña de tu red WiFi
 PIN_DHT = 4               # <-- pin de datos del DHT22
 PUERTO = 80
 
