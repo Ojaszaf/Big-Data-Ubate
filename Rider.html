@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Changa:wght@500;700;800&family=Permanent+Marker&family=Titan+One&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -61,11 +60,11 @@
 
       <div class="card kpi-card">
         <h3>Riesgo sobrestock</h3>
-        <p class="kpi-value status-good">0% bajo</p>
-        <div class="stars" role="img" aria-label="Nivel de búsqueda: 0 de 5 estrellas">
+        <p class="kpi-value status-good" id="riesgo-val">0% bajo</p>
+        <div class="stars" id="riesgo-stars" role="img" aria-label="Nivel de búsqueda: 0 de 5 estrellas">
           <i></i><i></i><i></i><i></i><i></i>
         </div>
-        <span class="kpi-subtext">Demanda optimizada, la policía no te busca</span>
+        <span class="kpi-subtext" id="riesgo-sub">Sin stock registrado, la policía no te busca</span>
       </div>
     </section>
 
@@ -82,29 +81,71 @@
     </section>
     <section class="card chart-card mov-card" aria-label="Ingresos y salidas">
   <h2>Ingresos y salidas</h2>
+  <p class="kpi-subtext" style="margin:-4px 0 10px">Elige un producto, pon solo la cantidad vendida y el valor total se calcula con su precio por unidad. Un ingreso (venta) descuenta del stock; una salida (compra) lo aumenta.</p>
   <form class="mov-form" id="mov-form" autocomplete="off">
-    <input name="concepto" type="text" placeholder="Concepto" maxlength="60" aria-label="Concepto">
-    <input name="valor" type="number" min="1" step="1" placeholder="Valor ($)" aria-label="Valor">
+    <input name="concepto" type="text" placeholder="Concepto / producto" maxlength="60" aria-label="Concepto" list="productos-lista">
+    <input name="cantidad" type="number" min="1" step="1" placeholder="Cantidad (opcional)" aria-label="Cantidad">
+    <input name="valor" type="number" min="1" step="1" placeholder="Valor total ($)" aria-label="Valor">
     <select name="tipo" aria-label="Tipo"><option value="ingreso">Ingreso</option><option value="salida">Salida</option></select>
     <button type="submit">Agregar</button>
   </form>
+  <datalist id="productos-lista"></datalist>
   <p class="mov-error" id="mov-error" role="alert"></p>
+  <p class="mov-ok" id="mov-ok" aria-live="polite"></p>
   <div class="mov-tools">
     <label>Día <input type="date" id="dia-sel"></label>
     <button type="button" id="btn-pdf">Guardar PDF del día</button>
   </div>
   <div class="table-wrap">
     <table class="mov">
-      <thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th class="num">Valor</th><th aria-label="Acciones"></th></tr></thead>
+      <thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th class="num">Cant.</th><th class="num">Valor</th><th aria-label="Acciones"></th></tr></thead>
       <tbody id="mov-body"></tbody>
       <tfoot>
-        <tr><td colspan="3">Total ingresos del día</td><td class="num ingreso" id="tot-ing"></td><td></td></tr>
-        <tr><td colspan="3">Total salidas del día</td><td class="num salida" id="tot-sal"></td><td></td></tr>
-        <tr><td colspan="3">Saldo del día</td><td class="num" id="tot-saldo"></td><td></td></tr>
-        <tr><td colspan="3">Acumulado total (todos los días)</td><td class="num" id="tot-acum"></td><td></td></tr>
+        <tr><td colspan="4">Total ingresos del día</td><td class="num ingreso" id="tot-ing"></td><td></td></tr>
+        <tr><td colspan="4">Total salidas del día</td><td class="num salida" id="tot-sal"></td><td></td></tr>
+        <tr><td colspan="4">Saldo del día</td><td class="num" id="tot-saldo"></td><td></td></tr>
+        <tr><td colspan="4">Acumulado total (todos los días)</td><td class="num" id="tot-acum"></td><td></td></tr>
       </tfoot>
     </table>
   </div>
+</section>
+
+    <section class="card chart-card mov-card" aria-label="Stock">
+  <h2>Stock de bodega</h2>
+  <form class="mov-form" id="stock-form" autocomplete="off">
+    <input name="producto" type="text" placeholder="Producto" maxlength="40" aria-label="Producto" list="productos-lista">
+    <input name="cantidad" type="number" min="1" step="1" placeholder="Cantidad (und)" aria-label="Cantidad">
+    <input name="precio" type="number" min="1" step="1" placeholder="Precio por unidad ($)" aria-label="Precio por unidad">
+    <select name="tipo" aria-label="Tipo"><option value="entrada">Entrada</option><option value="salida">Salida</option></select>
+    <button type="submit">Agregar</button>
+  </form>
+  <p class="mov-error" id="stock-error" role="alert"></p>
+  <p class="mov-ok" id="stock-ok" aria-live="polite"></p>
+  <div class="mov-tools">
+    <label>Día <input type="date" id="stock-dia"></label>
+    <label>Capacidad máxima (und) <input type="number" id="stock-cap" min="1" step="1" value="1000"></label>
+  </div>
+  <div class="table-wrap">
+    <table class="mov">
+      <thead><tr><th>Hora</th><th>Producto</th><th>Tipo</th><th class="num">Cantidad</th><th aria-label="Acciones"></th></tr></thead>
+      <tbody id="stock-body"></tbody>
+      <tfoot>
+        <tr><td colspan="3">Entradas del día</td><td class="num ingreso" id="st-ent"></td><td></td></tr>
+        <tr><td colspan="3">Salidas del día</td><td class="num salida" id="st-sal"></td><td></td></tr>
+        <tr><td colspan="3">Stock total en bodega</td><td class="num" id="st-total"></td><td></td></tr>
+        <tr><td colspan="3">Ocupación de la bodega</td><td class="num" id="st-pct"></td><td></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <h2 style="margin-top:22px">Productos y precios</h2>
+  <div class="table-wrap">
+    <table class="mov">
+      <thead><tr><th>Producto</th><th class="num">En stock</th><th class="num">Precio por unidad ($)</th><th class="num">Valor en stock</th><th aria-label="Acciones"></th></tr></thead>
+      <tbody id="cat-body"></tbody>
+    </table>
+  </div>
+  <h2 style="margin-top:22px">Stock por producto (% de la capacidad)</h2>
+  <canvas id="stockChart"></canvas>
 </section>
 
     <!-- Radio: ticker estilo emisora del juego -->

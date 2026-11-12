@@ -329,3 +329,8 @@ table.mov { width: 100%; min-width: 520px; border-collapse: collapse; }
 .mov .del { padding: 2px 8px; font: inherit; color: var(--muted); background: none; border: 1px solid rgba(255,255,255,.25); cursor: pointer; }
 .mov .del:hover { color: #ff6b6b; border-color: #ff6b6b; }
 .mov .vacio { text-align: center; color: var(--muted); }
+.mov-form input[name="cantidad"] { flex: 0 1 170px; }
+.mov-form input[name="precio"] { flex: 0 1 200px; }
+.mov-ok { min-height: 1.3em; margin-bottom: 6px; font-size: .95rem; font-weight: 700; color: var(--grove-bright); }
+.mov input.precio-in { width: 130px; font: inherit; text-align: right; padding: 4px 8px; color: var(--text); background: #000; border: 2px solid #000; outline: 1px solid rgba(255,255,255,.25); border-radius: 2px; }
+.mov .vender { padding: 3px 12px; font-family: 'Titan One', sans-serif; color: #fff; background: var(--grove); border: 2px solid #000; cursor: pointer; }

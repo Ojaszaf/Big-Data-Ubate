@@ -34,18 +34,19 @@ window.addEventListener("load", () => {
       if (!delDia.length) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = 5; td.className = 'vacio'; td.textContent = 'Sin movimientos este día';
+        td.colSpan = 6; td.className = 'vacio'; td.textContent = 'Sin movimientos este día';
         tr.appendChild(td); body.appendChild(tr);
       }
       delDia.forEach(m => {
         const tr = document.createElement('tr');
         const celdas = [m.hora, m.concepto, m.tipo === 'ingreso' ? 'Ingreso' : 'Salida',
+          m.cantidad ? m.cantidad.toLocaleString('es-CO') : '—',
           (m.tipo === 'ingreso' ? '+' : '-') + dinero(m.valor)];
         celdas.forEach((txt, i) => {
           const td = document.createElement('td');
           td.textContent = txt;
           if (i >= 2) td.className = m.tipo;
-          if (i === 3) td.classList.add('num');
+          if (i >= 3) td.classList.add('num');
           tr.appendChild(td);
         });
         const tdDel = document.createElement('td');
@@ -54,7 +55,8 @@ window.addEventListener("load", () => {
         b.setAttribute('aria-label', 'Eliminar movimiento');
         b.addEventListener('click', () => {
           movimientos = movimientos.filter(x => x.id !== m.id);
-          guardar(); pintarMovimientos();
+          stock = stock.filter(s => s.movId !== m.id);
+          guardar(); guardarStock(); pintarMovimientos(); pintarStock();
         });
         tdDel.appendChild(b); tr.appendChild(tdDel);
         body.appendChild(tr);
@@ -83,26 +85,42 @@ window.addEventListener("load", () => {
     fijar('ventas-dia-sub', ingHoy ? 'Salidas de hoy: ' + dinero(suma(hoy, 'salida')) : 'Aún sin ventas hoy');
   }
 
+  let valorManual = false;
   const formMov = document.getElementById('mov-form');
   if (formMov) {
     formMov.addEventListener('submit', e => {
       e.preventDefault();
       const concepto = formMov.elements.concepto.value.trim();
-      const valor = Number(formMov.elements.valor.value);
+      let valor = Number(formMov.elements.valor.value);
       const err = document.getElementById('mov-error');
+      const rawCant = formMov.elements.cantidad.value;
+      const cantidad = rawCant === '' ? 0 : Math.floor(Number(rawCant));
+      const tipo = formMov.elements.tipo.value;
+      const pu = precioDe(concepto);
+      if (!(valor > 0) && cantidad > 0 && tipo === 'ingreso' && pu) valor = cantidad * pu;
       if (!concepto || !(valor > 0)) {
-        err.textContent = 'Escribe un concepto y un valor mayor a 0';
+        err.textContent = 'Escribe un concepto y un valor (o elige un producto con precio y pon la cantidad)';
+        return;
+      }
+      if (rawCant !== '' && !(cantidad > 0)) {
+        err.textContent = 'La cantidad debe ser mayor a 0 (o déjala vacía)';
+        return;
+      }
+      if (cantidad && tipo === 'ingreso' && cantidad > stockDe(concepto)) {
+        err.textContent = 'No hay suficiente stock de "' + concepto + '" (hay ' + stockDe(concepto) + ')';
         return;
       }
       err.textContent = '';
       const d = new Date();
-      movimientos.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        fecha: diaActual(),
-        hora: dosDig(d.getHours()) + ':' + dosDig(d.getMinutes()),
-        concepto, tipo: formMov.elements.tipo.value, valor
-      });
-      guardar(); formMov.reset(); pintarMovimientos();
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const fecha = diaActual(), hora = dosDig(d.getHours()) + ':' + dosDig(d.getMinutes());
+      movimientos.push({ id, fecha, hora, concepto, tipo, valor, cantidad });
+      // Venta (ingreso) saca producto de la bodega; compra (salida) lo mete
+      if (cantidad) stock.push({ id: id + 's', movId: id, fecha, hora, producto: concepto, cantidad, tipo: tipo === 'ingreso' ? 'salida' : 'entrada' });
+      guardar(); guardarStock(); formMov.reset(); valorManual = false; pintarMovimientos(); pintarStock();
+      fijar('mov-ok', tipo === 'ingreso'
+        ? (cantidad ? 'Vendiste ' + cantidad + ' × ' + concepto + (pu ? ' a ' + dinero(pu) + ' c/u' : '') + ' = ' + dinero(valor) : 'Ingreso registrado: ' + dinero(valor))
+        : (cantidad ? 'Compraste ' + cantidad + ' × ' + concepto + ' por ' + dinero(valor) : 'Salida registrada: ' + dinero(valor)));
     });
   }
   if (diaInput) diaInput.addEventListener('change', () => { fijar('mov-error', ''); pintarMovimientos(); });
@@ -133,7 +151,7 @@ window.addEventListener("load", () => {
       if (y > 275) { doc.addPage(); y = 20; cabecera(); }
       doc.setTextColor(0, 0, 0);
       doc.text(m.hora, 14, y);
-      doc.text(doc.splitTextToSize(m.concepto, 90)[0], 36, y);
+      doc.text(doc.splitTextToSize(m.concepto + (m.cantidad ? ' (x' + m.cantidad + ')' : ''), 90)[0], 36, y);
       doc.text(m.tipo === 'ingreso' ? 'Ingreso' : 'Salida', 130, y);
       if (m.tipo === 'ingreso') doc.setTextColor(30, 130, 50); else doc.setTextColor(190, 40, 40);
       doc.text((m.tipo === 'ingreso' ? '+' : '-') + dinero(m.valor), 196, y, { align: 'right' });
@@ -154,6 +172,220 @@ window.addEventListener("load", () => {
   });
 
   pintarMovimientos();
+
+  // ---- Stock (entradas y salidas de producto) ----
+  const CLAVE_STOCK = 'stockUbate1', CLAVE_CAP = 'capacidadUbate1';
+  let stock = [];
+  try { const g = JSON.parse(localStorage.getItem(CLAVE_STOCK)); if (Array.isArray(g)) stock = g; } catch (e) {}
+  let capacidad = 1000;
+  try { capacidad = Number(localStorage.getItem(CLAVE_CAP)) || 1000; } catch (e) {}
+  const guardarStock = () => { try { localStorage.setItem(CLAVE_STOCK, JSON.stringify(stock)); } catch (e) {} };
+  let stockChart = null;
+  const CLAVE_PRECIOS = 'preciosUbate1';
+  let precios = {};
+  try { const g = JSON.parse(localStorage.getItem(CLAVE_PRECIOS)); if (g && typeof g === 'object') precios = g; } catch (e) {}
+  const guardarPrecios = () => { try { localStorage.setItem(CLAVE_PRECIOS, JSON.stringify(precios)); } catch (e) {} };
+  function precioDe(nombre) { return Number(precios[(nombre || '').trim().toLowerCase()]) || 0; }
+
+  const stDiaInput = document.getElementById('stock-dia');
+  if (stDiaInput) stDiaInput.value = hoyISO();
+  const stDiaActual = () => (stDiaInput && stDiaInput.value) || hoyISO();
+  const capInput = document.getElementById('stock-cap');
+  if (capInput) capInput.value = capacidad;
+
+  // Stock neto por producto (entradas - salidas)
+  function stockPorProducto() {
+    const mapa = {};
+    stock.forEach(m => {
+      const k = m.producto.toLowerCase();
+      if (!mapa[k]) mapa[k] = { nombre: m.producto, cant: 0 };
+      mapa[k].cant += m.tipo === 'entrada' ? m.cantidad : -m.cantidad;
+    });
+    return Object.values(mapa).filter(p => p.cant > 0);
+  }
+  const stockDe = nombre => { const p = stockPorProducto().find(x => x.nombre.toLowerCase() === nombre.toLowerCase()); return p ? p.cant : 0; };
+
+  // Todos los productos (con su stock neto y precio)
+  function todosProductos() {
+    const mapa = {};
+    stock.forEach(m => {
+      const k = m.producto.toLowerCase();
+      if (!mapa[k]) mapa[k] = { nombre: m.producto, cant: 0 };
+      mapa[k].cant += m.tipo === 'entrada' ? m.cantidad : -m.cantidad;
+    });
+    return Object.values(mapa);
+  }
+
+  // Vista previa en vivo en el formulario de ingresos: cantidad x precio = total
+  function previo() {
+    const f = formMov;
+    if (!f) return;
+    const c = f.elements.concepto.value.trim();
+    const q = Math.floor(Number(f.elements.cantidad.value));
+    const t = f.elements.tipo.value;
+    const pu = precioDe(c);
+    const hay = stockDe(c);
+    if (t === 'ingreso' && q > 0 && pu) {
+      if (!valorManual) f.elements.valor.value = q * pu;
+      fijar('mov-ok', q + ' × ' + dinero(pu) + ' = ' + dinero(q * pu) + (hay ? '   (en stock: ' + hay + ')' : ''));
+    } else {
+      fijar('mov-ok', t === 'ingreso' && c && pu ? c + ': ' + dinero(pu) + ' c/u' + (hay ? ' · en stock: ' + hay : '') : '');
+    }
+  }
+  if (formMov) {
+    ['concepto', 'cantidad', 'tipo'].forEach(n => formMov.elements[n].addEventListener('input', previo));
+    formMov.elements.valor.addEventListener('input', () => { valorManual = formMov.elements.valor.value !== ''; });
+  }
+
+  // Tabla "Productos y precios" (precio editable + botón Vender)
+  function pintarCatalogo() {
+    const lista = todosProductos().filter(p => p.cant > 0 || precioDe(p.nombre) > 0);
+    const dl = document.getElementById('productos-lista');
+    if (dl) { dl.replaceChildren(); todosProductos().forEach(p => { const o = document.createElement('option'); o.value = p.nombre; dl.appendChild(o); }); }
+    const body = document.getElementById('cat-body');
+    if (!body) return;
+    body.replaceChildren();
+    if (!lista.length) {
+      const tr = document.createElement('tr'), td = document.createElement('td');
+      td.colSpan = 5; td.className = 'vacio'; td.textContent = 'Aún no hay productos: agrega stock arriba';
+      tr.appendChild(td); body.appendChild(tr); return;
+    }
+    lista.forEach(p => {
+      const tr = document.createElement('tr');
+      const pu = precioDe(p.nombre);
+      const tdN = document.createElement('td'); tdN.textContent = p.nombre; tr.appendChild(tdN);
+      const tdC = document.createElement('td'); tdC.className = 'num'; tdC.textContent = Math.max(0, p.cant).toLocaleString('es-CO') + ' und'; tr.appendChild(tdC);
+      const tdP = document.createElement('td'); tdP.className = 'num';
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.min = '1'; inp.step = '1'; inp.className = 'precio-in';
+      inp.placeholder = 'Sin precio'; inp.value = pu || '';
+      inp.setAttribute('aria-label', 'Precio por unidad de ' + p.nombre);
+      inp.addEventListener('change', () => {
+        const v = Math.round(Number(inp.value));
+        if (v > 0) precios[p.nombre.toLowerCase()] = v; else delete precios[p.nombre.toLowerCase()];
+        guardarPrecios(); pintarStock(); previo();
+      });
+      tdP.appendChild(inp); tr.appendChild(tdP);
+      const tdV = document.createElement('td'); tdV.className = 'num';
+      tdV.textContent = pu ? dinero(Math.max(0, p.cant) * pu) : '—'; tr.appendChild(tdV);
+      const tdB = document.createElement('td');
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'vender'; b.textContent = 'Vender';
+      b.addEventListener('click', () => {
+        formMov.elements.concepto.value = p.nombre;
+        formMov.elements.tipo.value = 'ingreso';
+        formMov.elements.valor.value = ''; valorManual = false;
+        previo();
+        formMov.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        formMov.elements.cantidad.focus();
+      });
+      tdB.appendChild(b); tr.appendChild(tdB);
+      body.appendChild(tr);
+    });
+  }
+
+  function pintarStock() {
+    const dia = stDiaActual();
+    const delDia = stock.filter(m => m.fecha === dia).sort((a, b) => a.hora.localeCompare(b.hora));
+    const body = document.getElementById('stock-body');
+    if (body) {
+      body.replaceChildren();
+      if (!delDia.length) {
+        const tr = document.createElement('tr'), td = document.createElement('td');
+        td.colSpan = 5; td.className = 'vacio'; td.textContent = 'Sin movimientos de stock este día';
+        tr.appendChild(td); body.appendChild(tr);
+      }
+      delDia.forEach(m => {
+        const tr = document.createElement('tr');
+        const celdas = [m.hora, m.producto + (m.movId ? (m.tipo === 'salida' ? ' · venta' : ' · compra') : ''), m.tipo === 'entrada' ? 'Entrada' : 'Salida',
+          (m.tipo === 'entrada' ? '+' : '-') + m.cantidad.toLocaleString('es-CO')];
+        celdas.forEach((txt, i) => {
+          const td = document.createElement('td');
+          td.textContent = txt;
+          if (i >= 2) td.className = m.tipo === 'entrada' ? 'ingreso' : 'salida';
+          if (i === 3) td.classList.add('num');
+          tr.appendChild(td);
+        });
+        const tdDel = document.createElement('td');
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'del'; b.textContent = '×';
+        b.setAttribute('aria-label', 'Eliminar movimiento de stock');
+        b.addEventListener('click', () => {
+          stock = stock.filter(x => x.id !== m.id);
+          if (m.movId) { movimientos = movimientos.filter(x => x.id !== m.movId); guardar(); pintarMovimientos(); }
+          guardarStock(); pintarStock();
+        });
+        tdDel.appendChild(b); tr.appendChild(tdDel); body.appendChild(tr);
+      });
+    }
+
+    const prods = stockPorProducto();
+    const total = prods.reduce((a, p) => a + p.cant, 0);
+    const pct = Math.round((total / capacidad) * 1000) / 10;
+    const sumaT = t => delDia.filter(m => m.tipo === t).reduce((a, m) => a + m.cantidad, 0);
+    fijar('st-ent', '+' + sumaT('entrada').toLocaleString('es-CO'));
+    fijar('st-sal', '-' + sumaT('salida').toLocaleString('es-CO'));
+    fijar('st-total', total.toLocaleString('es-CO') + ' und');
+    fijar('st-pct', pct + '%');
+
+    pintarCatalogo();
+
+    // Tarjeta "Riesgo sobrestock" (porcentaje de ocupación)
+    const nivel = pct < 50 ? 'bajo' : pct < 80 ? 'medio' : 'alto';
+    const color = pct < 50 ? '' : pct < 80 ? 'var(--star)' : '#ff6b6b';
+    const rv = document.getElementById('riesgo-val');
+    if (rv) { rv.textContent = pct + '% ' + nivel; rv.style.color = color; }
+    const estrellas = pct >= 100 ? 5 : Math.floor(pct / 20);
+    document.querySelectorAll('#riesgo-stars i').forEach((s, i) => s.classList.toggle('on', i < estrellas));
+    const rs = document.getElementById('riesgo-stars');
+    if (rs) rs.setAttribute('aria-label', 'Nivel de búsqueda: ' + estrellas + ' de 5 estrellas');
+    fijar('riesgo-sub', !total ? 'Sin stock registrado, la policía no te busca'
+      : nivel === 'bajo' ? 'Demanda optimizada, la policía no te busca'
+      : nivel === 'medio' ? 'Cuidado, la bodega se está llenando'
+      : '¡Sobrestock! La policía ya va en camino');
+
+    // Gráfica: % de la capacidad por producto
+    if (stockChart) {
+      stockChart.data.labels = prods.map(p => p.nombre);
+      stockChart.data.datasets[0].data = prods.map(p => Math.round((p.cant / capacidad) * 1000) / 10);
+      stockChart.update();
+    }
+  }
+
+  const formStock = document.getElementById('stock-form');
+  if (formStock) formStock.addEventListener('submit', e => {
+    e.preventDefault();
+    const producto = formStock.elements.producto.value.trim();
+    const cantidad = Math.floor(Number(formStock.elements.cantidad.value));
+    const tipo = formStock.elements.tipo.value;
+    const err = document.getElementById('stock-error');
+    if (!producto || !(cantidad > 0)) { err.textContent = 'Escribe un producto y una cantidad mayor a 0'; return; }
+    if (tipo === 'salida' && cantidad > stockDe(producto)) {
+      err.textContent = 'No hay suficiente stock de "' + producto + '" (hay ' + stockDe(producto) + ')'; return;
+    }
+    err.textContent = '';
+    const precioNuevo = Math.round(Number(formStock.elements.precio.value));
+    if (precioNuevo > 0) { precios[producto.toLowerCase()] = precioNuevo; guardarPrecios(); }
+    const pu = precioDe(producto);
+    const d = new Date();
+    stock.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fecha: stDiaActual(), hora: dosDig(d.getHours()) + ':' + dosDig(d.getMinutes()),
+      producto, cantidad, tipo
+    });
+    guardarStock(); formStock.reset(); pintarStock();
+    fijar('stock-ok', tipo === 'entrada'
+      ? 'Agregaste ' + cantidad + ' × ' + producto + (pu ? ' a ' + dinero(pu) + ' c/u (valen ' + dinero(cantidad * pu) + ' en stock)' : ' · sin precio, ponlo en "Productos y precios"')
+      : 'Retiraste ' + cantidad + ' × ' + producto + ' del stock');
+  });
+  if (stDiaInput) stDiaInput.addEventListener('change', () => { fijar('stock-error', ''); pintarStock(); });
+  if (capInput) capInput.addEventListener('change', () => {
+    const v = Math.floor(Number(capInput.value));
+    if (v > 0) { capacidad = v; try { localStorage.setItem(CLAVE_CAP, String(v)); } catch (e) {} }
+    else capInput.value = capacidad;
+    pintarStock();
+  });
+  pintarStock();
 
   // Quitar el banner de misión del DOM cuando termina su animación
   const mission = document.getElementById('mission');
@@ -250,6 +482,17 @@ window.addEventListener("load", () => {
     });
   }
 
+  // 2b. Gráfico de stock por producto (% de la capacidad)
+  const stockCanvas = document.getElementById('stockChart');
+  if (stockCanvas) {
+    stockChart = new Chart(stockCanvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label: '% de la capacidad', data: [], backgroundColor: SA.green, borderColor: '#000', borderWidth: 2 }] },
+      options: { ...baseOptions, scales: { ...baseOptions.scales, y: { ...baseOptions.scales.y, beginAtZero: true, ticks: { color: SA.muted, callback: v => v + '%' } } } }
+    });
+    pintarStock();
+  }
+
   // Reloj del HUD
   const reloj = document.getElementById('hud-clock');
   const tick = () => { if (reloj) reloj.textContent = new Date().toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit', hour12:false}); };
@@ -307,7 +550,7 @@ window.addEventListener("load", () => {
   //setInterval(lecturaSimulada, 3000);
 
   // ---- Conexión real con la ESP32 ----
-  const ESP32_URL = 'http://10.157.16.157/datos';   // <-- cambia por la IP de tu ESP32
+  const ESP32_URL = 'http://10.157.16.48/datos';   // <-- cambia por la IP de tu ESP32
 
   function setEstado(enLinea) {
     const badge = document.querySelector('.status-badge');
