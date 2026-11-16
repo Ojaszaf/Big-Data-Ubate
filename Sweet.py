@@ -9,10 +9,14 @@ import dht
 from machine import Pin, time_pulse_us
 
 # ---------- CONFIGURACIÓN ----------
-SSID = "U-SALAS"
-PASSWORD = "CAMBIA_ESTA_CLAVE"   # <-- pon aquí tu contraseña
+SSID = "Julian"
+PASSWORD = "12345678"   # <-- pon aquí tu contraseña
 PIN_DHT = 4
 PUERTO = 80
+
+# Nube (ThingSpeak): la página de GitHub Pages lee los datos de aquí
+THINGSPEAK_KEY = "M0D4OKS0DL9J5E0X"   # <-- Write API Key de tu canal (NO la subas a GitHub)
+INTERVALO_NUBE = 20000                 # ms (ThingSpeak gratis permite 1 envío cada 15 s)
 
 # LCD 1602 en modo 4 bits (pines GPIO del ESP32)
 LCD_RS = 14
@@ -35,13 +39,13 @@ led = Pin(2, Pin.OUT)
 
 trig = Pin(PIN_TRIG, Pin.OUT, value=0)
 echo = Pin(PIN_ECHO, Pin.IN)
-rele = Pin(PIN_RELE, Pin.OUT)
+rele = Pin(PIN_RELE, Pin.OPEN_DRAIN, value=1)
 estado = {"dist": None, "luz": False}
 
 
 def poner_luz(encendida):
     estado["luz"] = encendida
-    rele.value((not encendida) if RELE_ACTIVO_BAJO else encendida)
+    rele.value(0 if encendida else 1)
 
 
 poner_luz(False)   # siempre arranca apagado
@@ -204,6 +208,30 @@ def actualizar_pantalla():
         mostrar("Error sensor DHT", linea2)
 
 
+# ---------- ENVÍO A LA NUBE (ThingSpeak) ----------
+def enviar_nube():
+    s = None
+    try:
+        temp, hum = leer_sensor()
+        d = estado["dist"]
+        ruta = "/update?api_key={}&field1={}&field2={}&field4={}".format(
+            THINGSPEAK_KEY, temp, hum, 1 if estado["luz"] else 0)
+        if d is not None:
+            ruta += "&field3={:.0f}".format(d)
+        addr = socket.getaddrinfo("api.thingspeak.com", 80)[0][-1]
+        s = socket.socket()
+        s.settimeout(5)
+        s.connect(addr)
+        s.send("GET {} HTTP/1.0\r\nHost: api.thingspeak.com\r\n\r\n".format(ruta).encode())
+        s.recv(64)
+        print("Datos enviados a la nube")
+    except Exception as e:
+        print("No se pudo enviar a la nube:", e)
+    finally:
+        if s:
+            s.close()
+
+
 # ---------- RESPUESTAS HTTP ----------
 def responder(cl, codigo, texto, cuerpo=""):
     cabecera = (
@@ -248,6 +276,7 @@ def iniciar_servidor():
 conectar_wifi()
 servidor = iniciar_servidor()
 ultima_pantalla = 0
+ultima_nube = time.ticks_add(time.ticks_ms(), -INTERVALO_NUBE)   # envía apenas arranca
 
 while True:
     if not wlan.isconnected():
@@ -255,6 +284,10 @@ while True:
         conectar_wifi()
 
     controlar_luz()
+
+    if wlan.isconnected() and time.ticks_diff(time.ticks_ms(), ultima_nube) >= INTERVALO_NUBE:
+        enviar_nube()
+        ultima_nube = time.ticks_ms()
 
     if time.ticks_diff(time.ticks_ms(), ultima_pantalla) > 2000:
         actualizar_pantalla()

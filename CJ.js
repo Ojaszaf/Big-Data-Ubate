@@ -550,7 +550,12 @@ window.addEventListener("load", () => {
   //setInterval(lecturaSimulada, 3000);
 
   // ---- Conexión real con la ESP32 ----
-  const ESP32_URL = 'http://10.157.16.48/datos';   // <-- cambia por la IP de tu ESP32
+  // En GitHub Pages (HTTPS) se leen los datos desde ThingSpeak (nube).
+  // Si abres la página en tu PC o desde la IP de la ESP32 (HTTP), lee directo de la ESP32.
+  const THINGSPEAK_CHANNEL = '3581843';                  // <-- ID de tu canal de ThingSpeak (canal público)
+  const ESP32_URL = 'http://10.157.16.48/datos';         // <-- IP local de la ESP32 (solo para uso en tu red)
+  const USAR_NUBE = location.protocol === 'https:';
+  const MAX_EDAD_MS = 90 * 1000;                         // si el último dato es más viejo que esto => sin conexión
 
   function setEstado(enLinea) {
     const badge = document.querySelector('.status-badge');
@@ -560,10 +565,32 @@ window.addEventListener("load", () => {
       (enLinea ? 'Respeto: ESP32 en línea' : 'Wasted: ESP32 sin conexión');
   }
 
+  let ultimoEntry = null;
+
+  async function leerNube() {
+    try {
+      const url = 'https://api.thingspeak.com/channels/' + THINGSPEAK_CHANNEL + '/feeds/last.json?_=' + Date.now();
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();                           // {created_at, entry_id, field1: temp, field2: hum}
+      const temp = parseFloat(d.field1), hum = parseFloat(d.field2);
+      if (isNaN(temp) || isNaN(hum)) throw new Error('Sin datos en el canal');
+      const edad = Date.now() - new Date(d.created_at).getTime();
+      if (d.entry_id !== ultimoEntry) {                   // solo grafica datos nuevos
+        ultimoEntry = d.entry_id;
+        actualizarDatosIoT(temp, hum);
+      }
+      setEstado(edad < MAX_EDAD_MS);
+    } catch (e) {
+      console.warn('ThingSpeak:', e);
+      setEstado(false);
+    }
+  }
+
   async function leerESP32() {
     try {
       const r = await fetch(ESP32_URL, { cache: 'no-store' });
-      const d = await r.json();               // espera {"temp": 18.2, "hum": 64.5}
+      const d = await r.json();                           // {"temp": 18.2, "hum": 64.5, ...}
       actualizarDatosIoT(d.temp, d.hum);
       setEstado(true);
     } catch (e) {
@@ -571,6 +598,11 @@ window.addEventListener("load", () => {
     }
   }
 
-  leerESP32();
-  setInterval(leerESP32, 3000);
+  if (USAR_NUBE) {
+    leerNube();
+    setInterval(leerNube, 15000);                         // ThingSpeak actualiza cada ~20 s
+  } else {
+    leerESP32();
+    setInterval(leerESP32, 3000);
+  }
 });
